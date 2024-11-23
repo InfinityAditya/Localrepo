@@ -1,4 +1,135 @@
-<p>This is a new Repo</p>
-<p>This is a new feature {dropdown}</p>
-<p>This is a new feature (button)</p>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Name Guessing Game</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="game-container">
+        <h1>Name Guessing Game</h1>
+        <p id="lifes">Lives: {{ lifes }}</p>
+        <p id="placeholder">{{ placeholder }}</p>
+        <p id="message">{{ message }}</p>
 
+        <input type="text" id="guessInput" maxlength="1" placeholder="Guess a letter" />
+        <button id="guessButton">Guess</button>
+        <button id="restartButton">Restart Game</button>
+
+        <div id="gameResult"></div>
+
+        <!-- Hangman image -->
+        <div id="hangman">
+            <img src="{{ url_for('static', filename='images/hangman6.png') }}" id="hangmanImage" />
+        </div>
+    </div>
+
+    <!-- Python Code Display -->
+    <div class="code-section">
+        <h2>Python Code:</h2>
+        <pre>
+<code>
+from flask import Flask, render_template, request, jsonify
+from game_logic import initialize_game, make_guess
+
+app = Flask(__name__)
+
+# Store the game state
+game_state = initialize_game()
+
+# Home route that renders the game
+@app.route('/')
+def index():
+    return render_template('index.html', 
+                           placeholder=game_state['placeholder'], 
+                           lifes=game_state['lifes'],
+                           message=game_state['message'])
+
+# Handle the guess route
+@app.route('/guess', methods=['POST'])
+def guess():
+    global game_state
+    guess = request.form['guess'].lower()
+
+    # Update the game state after the guess
+    game_state = make_guess(game_state, guess)
+
+    if 'error' in game_state:
+        return jsonify({'error': game_state['error']})
+
+    return jsonify({
+        'lifes': game_state['lifes'],
+        'placeholder': game_state['placeholder'],
+        'game_over': game_state['game_over'],
+        'message': game_state['message']
+    })
+
+# Restart the game route
+@app.route('/restart', methods=['POST'])
+def restart():
+    global game_state
+    game_state = initialize_game()  # Restart the game
+    return jsonify({
+        'lifes': game_state['lifes'],
+        'placeholder': game_state['placeholder'],
+        'game_over': game_state['game_over'],
+        'message': game_state['message']
+    })
+
+if __name__ == '__main__':
+    app.run(debug=True)
+</code>
+        </pre>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $("#guessButton").click(function() {
+                var guess = $("#guessInput").val();
+                if (guess) {
+                    $.ajax({
+                        type: "POST",
+                        url: "/guess",
+                        data: { guess: guess },
+                        success: function(response) {
+                            if (response.error) {
+                                alert(response.error);
+                            } else {
+                                $("#placeholder").text(response.placeholder);
+                                $("#lifes").text("Lives: " + response.lifes);
+                                $("#message").text(response.message);
+                                
+                                if (response.game_over) {
+                                    $("#guessButton").prop("disabled", true);
+                                }
+                            }
+
+                            // Hangman images based on lives
+                            var hangmanImages = [
+                                "hangman6.png", "hangman5.png", "hangman4.png", 
+                                "hangman3.png", "hangman2.png", "hangman1.png", "hangman0.png"
+                            ];
+                            $("#hangmanImage").attr("src", "{{ url_for('static', filename='images/') }}" + hangmanImages[6 - response.lifes]);
+                        }
+                    });
+                }
+            });
+
+            $("#restartButton").click(function() {
+                $.ajax({
+                    type: "POST",
+                    url: "/restart",
+                    success: function(response) {
+                        $("#placeholder").text(response.placeholder);
+                        $("#lifes").text("Lives: " + response.lifes);
+                        $("#message").text(response.message);
+                        $("#guessButton").prop("disabled", false);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
